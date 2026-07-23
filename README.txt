@@ -1,0 +1,1 @@
+Open index.html directly or upload the folder to Vercel. The overlay button opens Apple Maps on Apple devices and Google Maps on other devices.

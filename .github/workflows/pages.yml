@@ -1,4 +1,4 @@
-name: Deploy static site to GitHub Pages
+name: Publish static site
 
 on:
   push:
@@ -7,34 +7,41 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
   group: pages
   cancel-in-progress: false
 
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  publish:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
-        with:
-          enablement: true
+      - name: Publish to gh-pages branch
+        shell: bash
+        run: |
+          set -euo pipefail
 
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: .
+          export WORKTREE="$(mktemp -d)"
+          cp index.html invitation.png README.md README.txt .nojekyll "$WORKTREE"/
 
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git fetch origin gh-pages || true
+          if git rev-parse --verify origin/gh-pages >/dev/null 2>&1; then
+            git worktree add "$WORKTREE-branch" origin/gh-pages
+            git -C "$WORKTREE-branch" rm -rf . >/dev/null 2>&1 || true
+          else
+            git worktree add --detach "$WORKTREE-branch"
+            git -C "$WORKTREE-branch" checkout --orphan gh-pages
+            git -C "$WORKTREE-branch" rm -rf . >/dev/null 2>&1 || true
+          fi
+
+          cp -R "$WORKTREE"/. "$WORKTREE-branch"/
+          git -C "$WORKTREE-branch" add .
+          git -C "$WORKTREE-branch" commit -m "Publish site" || exit 0
+          git -C "$WORKTREE-branch" push origin HEAD:gh-pages
